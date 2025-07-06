@@ -169,7 +169,7 @@ function App() {
     >
       <div className="relative">
         {/* Image placeholder with exact dimensions */}
-        <div className="w-full h-56 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border border-gray-700 rounded-t-2xl">
+        <div className="w-full h-56 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border border-gray-700 border-solid rounded-t-2xl">
           <div className="text-center text-gray-400">
             <div className="text-6xl mb-2 opacity-30">💊</div>
             <div className="text-sm font-medium mb-1">Product Image</div>
@@ -240,7 +240,7 @@ function App() {
     return (
       <div className="min-h-screen bg-black">
         <div className="max-w-md mx-auto">
-          <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800">
+          <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800 border-solid">
             <button
               onClick={() => setCurrentView('home')}
               className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
@@ -267,7 +267,7 @@ function App() {
             </div>
 
             <div className="space-y-6">
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 border-solid">
                 <h1 className="text-2xl font-bold text-white mb-3">{selectedProduct.name}</h1>
                 <div className="flex items-center space-x-4 mb-4">
                   <div className="flex items-center space-x-1">
@@ -282,7 +282,7 @@ function App() {
                 <p className="text-gray-300 leading-relaxed">{selectedProduct.description}</p>
               </div>
 
-              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+              <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 border-solid">
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-3xl font-bold text-purple-400">
                     €{selectedProduct.price.toFixed(2)}
@@ -308,7 +308,7 @@ function App() {
   const CartPage = () => (
     <div className="min-h-screen bg-black">
       <div className="max-w-md mx-auto">
-        <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800">
+        <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800 border-solid">
           <button
             onClick={() => setCurrentView('home')}
             className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
@@ -337,7 +337,7 @@ function App() {
                 <div key={item.id} className="glass-card rounded-2xl p-6 hover-lift animate-fadeIn">
                   <div className="flex items-center space-x-6">
                     {/* Small image placeholder for cart */}
-                    <div className="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border border-gray-600 rounded-xl shadow-inner-glow">
+                    <div className="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border border-gray-600 border-solid rounded-xl shadow-inner-glow">
                       <div className="text-2xl opacity-50">💊</div>
                     </div>
                     <div className="flex-1">
@@ -391,6 +391,7 @@ function App() {
     const [formData, setFormData] = useState({
       telegram: '',
       phone: '',
+      email: '',
       address: '',
       deliveryType: 'home' // 'home' or 'pickup'
     });
@@ -581,8 +582,57 @@ ${customerMessage}
       }
     };
 
+    const sendEmailConfirmation = async (orderData: {
+      orderRef: string;
+      items: CartItem[];
+      total: number;
+      telegram: string;
+      phone: string;
+      email: string;
+      deliveryType: string;
+      address?: string;
+    }) => {
+      const deliveryEstimate = orderData.deliveryType === 'home' ? '24-48h' : '2-4h';
+      
+      // Message structuré pour envoi par webhook (vous pouvez utiliser Zapier, Make.com, ou un service similaire)
+      const emailData = {
+        to: orderData.email,
+        subject: `Confirmation de commande ChronoMedical #${orderData.orderRef}`,
+        orderRef: orderData.orderRef,
+        customer: {
+          telegram: orderData.telegram,
+          phone: orderData.phone,
+          email: orderData.email
+        },
+        items: orderData.items,
+        total: orderData.total,
+        delivery: {
+          type: orderData.deliveryType,
+          address: orderData.address,
+          estimate: deliveryEstimate
+        },
+        timestamp: new Date().toLocaleString('fr-FR')
+      };
+
+      try {
+        // Option 1: Webhook vers votre service d'email (recommandé)
+        await fetch('https://webhook.site/your-webhook-url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'email_confirmation',
+            data: emailData
+          })
+        });
+      } catch (error) {
+        console.error('Erreur envoi email:', error);
+      }
+    };
+
     const handleCheckout = async () => {
-      if (!formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)) {
+      if (!formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)) {
         return;
       }
       
@@ -597,6 +647,7 @@ ${customerMessage}
         total: getTotalPrice(),
         telegram: formData.telegram,
         phone: formData.phone,
+        email: formData.email,
         deliveryType: formData.deliveryType,
         address: formData.address
       };
@@ -605,7 +656,8 @@ ${customerMessage}
       try {
         await Promise.all([
           sendTelegramNotification(orderData),
-          sendCustomerConfirmation(orderData)
+          sendCustomerConfirmation(orderData),
+          sendEmailConfirmation(orderData)
         ]);
       } catch (error) {
         console.error('Erreur notifications:', error);
@@ -619,7 +671,7 @@ ${customerMessage}
           setIsComplete(false);
           setCurrentView('home');
           setCart([]);
-          setFormData({ telegram: '', phone: '', address: '', deliveryType: 'home' });
+          setFormData({ telegram: '', phone: '', email: '', address: '', deliveryType: 'home' });
         }, 8000);
       }, 2000);
     };
@@ -701,7 +753,7 @@ ${customerMessage}
     return (
       <div className="min-h-screen bg-black">
         <div className="max-w-md mx-auto">
-          <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800">
+          <div className="sticky top-16 bg-black/95 backdrop-blur-sm z-40 px-6 py-3 border-b border-gray-800 border-solid">
             <button
               onClick={() => setCurrentView('cart')}
               className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
@@ -725,7 +777,7 @@ ${customerMessage}
                   Mode de Livraison
                 </h3>
                 <div className="space-y-4">
-                  <label className="flex items-center space-x-4 p-4 rounded-xl glass-card border-gray-700 cursor-pointer hover-lift transition-all">
+                  <label className="flex items-center space-x-4 p-4 rounded-xl glass-card border-gray-700 border-[1px] border-solid cursor-pointer hover-lift transition-all">
                     <input 
                       type="radio" 
                       name="delivery" 
@@ -739,7 +791,7 @@ ${customerMessage}
                       <p className="text-gray-400 font-medium">Livraison à votre adresse</p>
                     </div>
                   </label>
-                  <label className="flex items-center space-x-4 p-4 rounded-xl glass-card border-gray-700 cursor-pointer hover-lift transition-all">
+                  <label className="flex items-center space-x-4 p-4 rounded-xl glass-card border-gray-700 border-[1px] border-solid cursor-pointer hover-lift transition-all">
                     <input 
                       type="radio" 
                       name="delivery" 
@@ -791,6 +843,13 @@ ${customerMessage}
                     className="input-field w-full p-4 rounded-xl text-white placeholder-gray-400 font-medium text-lg"
                   />
                   <input
+                    type="email"
+                    placeholder="votre.email@exemple.com (Email de confirmation)"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="input-field w-full p-4 rounded-xl text-white placeholder-gray-400 font-medium text-lg"
+                  />
+                  <input
                     type="tel"
                     placeholder="+33 1 23 45 67 89 (Phone with country code)"
                     value={formData.phone}
@@ -800,19 +859,11 @@ ${customerMessage}
                 </div>
                 <div className="mt-4 p-4 bg-blue-900/30 backdrop-blur-md rounded-xl border border-blue-800/30">
                   <p className="text-blue-300 font-medium mb-3">
-                    📞 Notre équipe vous contactera via Telegram pour confirmer votre commande et organiser la livraison sécurisée.
+                    📧 Vous recevrez une confirmation par email et notre équipe vous contactera via Telegram pour organiser la livraison.
                   </p>
-                  <a 
-                    href="https://t.me/ChronoShopBot?start=hello"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    <span>🤖</span>
-                    <span>Démarrer la conversation avec @ChronoShopBot</span>
-                  </a>
-                  <p className="text-blue-200 text-sm mt-2">
-                    ⚠️ Cliquez sur ce lien pour recevoir votre confirmation de commande
+                  <p className="text-blue-200 text-sm">
+                    ✅ Confirmation automatique par email<br/>
+                    📞 Contact équipe via Telegram pour le suivi
                   </p>
                 </div>
               </div>
@@ -826,7 +877,7 @@ ${customerMessage}
                 </div>
                 <button
                   onClick={handleCheckout}
-                  disabled={isProcessing || !formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)}
+                  disabled={isProcessing || !formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)}
                   className="btn-primary w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? (
@@ -841,11 +892,11 @@ ${customerMessage}
                     </>
                   )}
                 </button>
-                {(!formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)) && (
+                {(!formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)) && (
                   <p className="text-red-400 font-medium mt-4 text-center p-3 bg-red-900/20 rounded-xl border border-red-800/30">
                     {formData.deliveryType === 'home' 
-                      ? 'Veuillez remplir tous les champs requis (Telegram, téléphone et adresse)'
-                      : 'Veuillez remplir votre nom d\'utilisateur Telegram et numéro de téléphone'
+                      ? 'Veuillez remplir tous les champs requis (Telegram, email, téléphone et adresse)'
+                      : 'Veuillez remplir votre nom d\'utilisateur Telegram, email et numéro de téléphone'
                     }
                   </p>
                 )}

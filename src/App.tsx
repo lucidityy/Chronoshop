@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Menu, X, Star, Plus, Minus, Check, ArrowLeft, Truck, CreditCard, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Menu, X, Star, Plus, Minus, Check, ArrowLeft, Truck, MessageCircle } from 'lucide-react';
 
 // Types
 interface Product {
@@ -472,6 +472,7 @@ _${new Date().toLocaleString('fr-FR')}_`;
       address?: string;
     }) => {
       const botToken = '7576637364:AAHc904cJr58hHy3neSLimEMLGHtBxQ9JpA';
+      const chatId = '1823225052'; // Chat de l'équipe comme fallback
       const username = orderData.telegram.replace('@', '');
       
       const deliveryEstimate = orderData.deliveryType === 'home' ? '24-48h' : '2-4h';
@@ -508,8 +509,10 @@ L'équipe ChronoMedical
 ---
 _Commande passée le ${new Date().toLocaleString('fr-FR')}_`;
 
+      let messageSent = false;
+
       try {
-        // Get user ID by username
+        // Essayer d'envoyer directement au client
         const userResponse = await fetch(`https://api.telegram.org/bot${botToken}/getChat`, {
           method: 'POST',
           headers: {
@@ -523,8 +526,7 @@ _Commande passée le ${new Date().toLocaleString('fr-FR')}_`;
         if (userResponse.ok) {
           const userData = await userResponse.json();
           if (userData.ok) {
-            // Send message to customer
-            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            const messageResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -535,10 +537,47 @@ _Commande passée le ${new Date().toLocaleString('fr-FR')}_`;
                 parse_mode: 'Markdown'
               })
             });
+            
+            if (messageResponse.ok) {
+              messageSent = true;
+            }
           }
         }
       } catch (error) {
-        console.error('Erreur envoi confirmation client:', error);
+        console.error('Erreur envoi direct au client:', error);
+      }
+
+      // Si l'envoi direct échoue, envoyer via le chat équipe avec instructions
+      if (!messageSent) {
+        try {
+          const fallbackMessage = `⚠️ *CONFIRMATION À ENVOYER MANUELLEMENT*
+
+Le client ${orderData.telegram} n'a pas encore démarré de conversation avec le bot.
+
+*Message à lui transférer :*
+
+${customerMessage}
+
+---
+💡 *Instructions :*
+1. Demandez au client de cliquer sur : https://t.me/ChronoShopBot?start=hello
+2. Ou envoyez-lui le message ci-dessus manuellement
+3. Une fois la conversation initiée, les prochaines commandes seront automatiques`;
+
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: fallbackMessage,
+              parse_mode: 'Markdown'
+            })
+          });
+        } catch (error) {
+          console.error('Erreur envoi fallback:', error);
+        }
       }
     };
 
@@ -760,8 +799,20 @@ _Commande passée le ${new Date().toLocaleString('fr-FR')}_`;
                   />
                 </div>
                 <div className="mt-4 p-4 bg-blue-900/30 backdrop-blur-md rounded-xl border border-blue-800/30">
-                  <p className="text-blue-300 font-medium">
+                  <p className="text-blue-300 font-medium mb-3">
                     📞 Notre équipe vous contactera via Telegram pour confirmer votre commande et organiser la livraison sécurisée.
+                  </p>
+                  <a 
+                    href="https://t.me/ChronoShopBot?start=hello"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    <span>🤖</span>
+                    <span>Démarrer la conversation avec @ChronoShopBot</span>
+                  </a>
+                  <p className="text-blue-200 text-sm mt-2">
+                    ⚠️ Cliquez sur ce lien pour recevoir votre confirmation de commande
                   </p>
                 </div>
               </div>

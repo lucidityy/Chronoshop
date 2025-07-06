@@ -408,6 +408,7 @@ function App() {
       total: number;
       telegram: string;
       phone: string;
+      email: string;
       deliveryType: string;
       address?: string;
     }) => {
@@ -423,13 +424,14 @@ function App() {
         `• ${item.name} x${item.quantity} - €${(item.price * item.quantity).toFixed(2)}`
       ).join('\n');
       
-      const message = `🎉 *NOUVELLE COMMANDE REÇUE*
-      
+            const message = `🎉 *NOUVELLE COMMANDE REÇUE*
+       
 ⏰ *ChronoMedical* - Commande #${orderData.orderRef}
 
 👤 *Client*
 ${orderData.telegram}
 📱 ${orderData.phone}
+📧 ${orderData.email || 'Non fourni'}
 
 🛍️ *Détails de la commande*
 ${itemsList}
@@ -442,9 +444,25 @@ ${deliveryInfo}
 
 ✅ *Statut*: En cours de traitement
 
+📱 *Instructions client*:
+Le client doit envoyer "${orderData.orderRef}" au bot pour recevoir sa confirmation automatique.
+
 ---
 _Commande passée via ChronoMedical_
-_${new Date().toLocaleString('fr-FR')}_`;
+_${new Date().toLocaleString('fr-FR')}_
+
+*DONNÉES POUR BOT* (copier pour configuration):
+\`\`\`
+REF: ${orderData.orderRef}
+CLIENT: ${orderData.telegram}
+EMAIL: ${orderData.email || 'Non fourni'}  
+PHONE: ${orderData.phone}
+ITEMS: ${itemsList.replace(/\n/g, ' | ')}
+TOTAL: €${orderData.total.toFixed(2)}
+DELIVERY: ${orderData.deliveryType === 'home' ? `Domicile - ${orderData.address}` : 'Sur place'}
+ESTIMATE: ${deliveryEstimate}
+DATE: ${new Date().toLocaleString('fr-FR')}
+\`\`\``;
 
       try {
         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -469,6 +487,7 @@ _${new Date().toLocaleString('fr-FR')}_`;
       total: number;
       telegram: string;
       phone: string;
+      email: string;
       deliveryType: string;
       address?: string;
     }) => {
@@ -632,7 +651,7 @@ ${customerMessage}
     };
 
     const handleCheckout = async () => {
-      if (!formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)) {
+      if (!formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)) {
         return;
       }
       
@@ -654,11 +673,17 @@ ${customerMessage}
       
       // Send notifications
       try {
-        await Promise.all([
+        const notifications = [
           sendTelegramNotification(orderData),
-          sendCustomerConfirmation(orderData),
-          sendEmailConfirmation(orderData)
-        ]);
+          sendCustomerConfirmation(orderData)
+        ];
+        
+        // Ajouter l'email seulement si fourni
+        if (formData.email) {
+          notifications.push(sendEmailConfirmation(orderData));
+        }
+        
+        await Promise.all(notifications);
       } catch (error) {
         console.error('Erreur notifications:', error);
       }
@@ -741,8 +766,45 @@ ${customerMessage}
                 </div>
               </div>
               
-              <p className="text-gray-400 text-lg font-medium leading-relaxed">
-                Notre équipe vous contactera via Telegram <span className="text-gradient font-bold">{formData.telegram}</span> pour confirmer votre commande et organiser la livraison.
+              {/* Instructions pour récupérer la confirmation */}
+              <div className="bg-gradient-to-r from-purple-900/40 to-blue-900/40 backdrop-blur-md rounded-2xl p-6 mb-6 border border-purple-600/30">
+                <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+                  <span className="text-2xl mr-3">📱</span>
+                  Pour recevoir votre confirmation
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <span className="bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
+                    <p className="text-gray-300 font-medium">
+                      Copiez votre numéro de commande : <span className="text-white font-mono bg-gray-800 px-2 py-1 rounded">{orderRef}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <span className="bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</span>
+                    <div>
+                      <p className="text-gray-300 font-medium mb-2">Envoyez ce numéro à notre bot Telegram :</p>
+                      <a 
+                        href={`https://t.me/ChronoShopBot?text=${orderRef}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                      >
+                        <span>🤖</span>
+                        <span>Ouvrir @ChronoShopBot</span>
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
+                    <p className="text-gray-300 font-medium">
+                      Vous recevrez automatiquement votre récapitulatif complet !
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <p className="text-gray-400 text-lg font-medium leading-relaxed text-center">
+                Notre équipe vous contactera via Telegram <span className="text-gradient font-bold">{formData.telegram}</span> pour organiser la livraison.
               </p>
             </div>
           </div>
@@ -844,7 +906,7 @@ ${customerMessage}
                   />
                   <input
                     type="email"
-                    placeholder="votre.email@exemple.com (Email de confirmation)"
+                    placeholder="votre.email@exemple.com (Optionnel)"
                     value={formData.email}
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="input-field w-full p-4 rounded-xl text-white placeholder-gray-400 font-medium text-lg"
@@ -859,11 +921,11 @@ ${customerMessage}
                 </div>
                 <div className="mt-4 p-4 bg-blue-900/30 backdrop-blur-md rounded-xl border border-blue-800/30">
                   <p className="text-blue-300 font-medium mb-3">
-                    📧 Vous recevrez une confirmation par email et notre équipe vous contactera via Telegram pour organiser la livraison.
+                    🤖 Après votre commande, vous pourrez obtenir votre confirmation en envoyant votre numéro de commande à notre bot.
                   </p>
                   <p className="text-blue-200 text-sm">
-                    ✅ Confirmation automatique par email<br/>
-                    📞 Contact équipe via Telegram pour le suivi
+                    ✅ Confirmation instantanée via bot Telegram<br/>
+                    📞 Notre équipe vous contactera ensuite pour la livraison
                   </p>
                 </div>
               </div>
@@ -877,7 +939,7 @@ ${customerMessage}
                 </div>
                 <button
                   onClick={handleCheckout}
-                  disabled={isProcessing || !formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)}
+                  disabled={isProcessing || !formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)}
                   className="btn-primary w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? (
@@ -892,11 +954,11 @@ ${customerMessage}
                     </>
                   )}
                 </button>
-                {(!formData.telegram || !formData.phone || !formData.email || (formData.deliveryType === 'home' && !formData.address)) && (
+                {(!formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)) && (
                   <p className="text-red-400 font-medium mt-4 text-center p-3 bg-red-900/20 rounded-xl border border-red-800/30">
                     {formData.deliveryType === 'home' 
-                      ? 'Veuillez remplir tous les champs requis (Telegram, email, téléphone et adresse)'
-                      : 'Veuillez remplir votre nom d\'utilisateur Telegram, email et numéro de téléphone'
+                      ? 'Veuillez remplir tous les champs requis (Telegram, téléphone et adresse)'
+                      : 'Veuillez remplir votre nom d\'utilisateur Telegram et numéro de téléphone'
                     }
                   </p>
                 )}

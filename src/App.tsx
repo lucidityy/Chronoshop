@@ -401,6 +401,147 @@ function App() {
       return `CM-${timestamp}-${random}`.toUpperCase();
     };
 
+    const sendTelegramNotification = async (orderData: {
+      orderRef: string;
+      items: CartItem[];
+      total: number;
+      telegram: string;
+      phone: string;
+      deliveryType: string;
+      address?: string;
+    }) => {
+      const botToken = '7576637364:AAHc904cJr58hHy3neSLimEMLGHtBxQ9JpA';
+      const chatId = '1823225052';
+      
+      const deliveryEstimate = orderData.deliveryType === 'home' ? '24-48h' : '2-4h';
+      const deliveryInfo = orderData.deliveryType === 'home' 
+        ? `🏠 Livraison à domicile\n📍 ${orderData.address}`
+        : '📍 Retrait sur place (adresse communiquée par MP)';
+      
+      const itemsList = orderData.items.map(item => 
+        `• ${item.name} x${item.quantity} - €${(item.price * item.quantity).toFixed(2)}`
+      ).join('\n');
+      
+      const message = `🎉 *NOUVELLE COMMANDE REÇUE*
+      
+⏰ *ChronoMedical* - Commande #${orderData.orderRef}
+
+👤 *Client*
+${orderData.telegram}
+📱 ${orderData.phone}
+
+🛍️ *Détails de la commande*
+${itemsList}
+
+💰 *Total: €${orderData.total.toFixed(2)}*
+
+🚚 *Livraison*
+${deliveryInfo}
+⏱️ Estimation: ${deliveryEstimate}
+
+✅ *Statut*: En cours de traitement
+
+---
+_Commande passée via ChronoMedical_
+_${new Date().toLocaleString('fr-FR')}_`;
+
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'Markdown'
+          })
+        });
+      } catch (error) {
+        console.error('Erreur envoi Telegram:', error);
+      }
+    };
+
+    const sendCustomerConfirmation = async (orderData: {
+      orderRef: string;
+      items: CartItem[];
+      total: number;
+      telegram: string;
+      phone: string;
+      deliveryType: string;
+      address?: string;
+    }) => {
+      const botToken = '7576637364:AAHc904cJr58hHy3neSLimEMLGHtBxQ9JpA';
+      const username = orderData.telegram.replace('@', '');
+      
+      const deliveryEstimate = orderData.deliveryType === 'home' ? '24-48h' : '2-4h';
+      const deliveryInfo = orderData.deliveryType === 'home' 
+        ? `🏠 Livraison à domicile\n📍 ${orderData.address}`
+        : '📍 Retrait sur place\n(L\'adresse vous sera communiquée prochainement)';
+      
+      const itemsList = orderData.items.map(item => 
+        `• ${item.name} x${item.quantity} - €${(item.price * item.quantity).toFixed(2)}`
+      ).join('\n');
+      
+      const customerMessage = `🎉 *Merci pour votre commande !*
+
+⏰ *ChronoMedical* vous confirme votre commande
+
+📋 *Récapitulatif*
+Référence: #${orderData.orderRef}
+
+🛍️ *Vos articles*
+${itemsList}
+
+💰 *Total: €${orderData.total.toFixed(2)}*
+
+🚚 *Livraison*
+${deliveryInfo}
+⏱️ Estimation: ${deliveryEstimate}
+
+✅ *Prochaines étapes*
+Notre équipe va traiter votre commande et vous contacter sous peu pour finaliser les détails de livraison.
+
+🙏 *Merci de votre confiance !*
+L'équipe ChronoMedical
+
+---
+_Commande passée le ${new Date().toLocaleString('fr-FR')}_`;
+
+      try {
+        // Get user ID by username
+        const userResponse = await fetch(`https://api.telegram.org/bot${botToken}/getChat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: `@${username}`
+          })
+        });
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          if (userData.ok) {
+            // Send message to customer
+            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                chat_id: userData.result.id,
+                text: customerMessage,
+                parse_mode: 'Markdown'
+              })
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Erreur envoi confirmation client:', error);
+      }
+    };
+
     const handleCheckout = async () => {
       if (!formData.telegram || !formData.phone || (formData.deliveryType === 'home' && !formData.address)) {
         return;
@@ -409,6 +550,27 @@ function App() {
       setIsProcessing(true);
       const ref = generateOrderRef();
       setOrderRef(ref);
+      
+      // Prepare order data
+      const orderData = {
+        orderRef: ref,
+        items: cart,
+        total: getTotalPrice(),
+        telegram: formData.telegram,
+        phone: formData.phone,
+        deliveryType: formData.deliveryType,
+        address: formData.address
+      };
+      
+      // Send notifications
+      try {
+        await Promise.all([
+          sendTelegramNotification(orderData),
+          sendCustomerConfirmation(orderData)
+        ]);
+      } catch (error) {
+        console.error('Erreur notifications:', error);
+      }
       
       // Simulate order processing
       setTimeout(() => {

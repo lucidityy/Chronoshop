@@ -671,11 +671,45 @@ ${customerMessage}
         address: formData.address
       };
       
+      // Send data to webhook for bot automation
+      const sendToWebhook = async (data: {
+        orderRef: string;
+        items: CartItem[];
+        total: number;
+        telegram: string;
+        phone: string;
+        email: string;
+        deliveryType: string;
+        address?: string;
+      }) => {
+        try {
+          // URL du webhook déployé sur Vercel (avec corrections Method not allowed)
+          const WEBHOOK_URL = 'https://y-jzf97r9q3-1gotscarzs-projects.vercel.app/api/orders';
+          
+          const response = await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+          });
+          
+          if (response.ok) {
+            console.log('Commande envoyée au webhook avec succès');
+          } else {
+            console.error('Erreur webhook:', await response.text());
+          }
+        } catch (error) {
+          console.error('Erreur connexion webhook:', error);
+        }
+      };
+      
       // Send notifications
       try {
         const notifications = [
           sendTelegramNotification(orderData),
-          sendCustomerConfirmation(orderData)
+          sendCustomerConfirmation(orderData),
+          sendToWebhook(orderData) // Ajouter l'envoi au webhook
         ];
         
         // Ajouter l'email seulement si fourni

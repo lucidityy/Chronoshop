@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Webhook ChronoMedical - Solution Express.js</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        .url-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .url-input:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-ok {
+            background: #28a745;
+            color: white;
+        }
+        .status-error {
+            background: #dc3545;
+            color: white;
+        }
+        .status-pending {
+            background: #ffc107;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Webhook ChronoMedical</h1>
+        <p class="subtitle">Solution Express.js - Fiable et Simple</p>
+        
+        <div class="test-section">
+            <h3>🔧 Configuration de l'URL du Webhook</h3>
+            <p>Entrez l'URL de votre serveur webhook déployé :</p>
+            <input type="url" 
+                   id="webhookUrl" 
+                   class="url-input" 
+                   placeholder="https://votre-webhook.onrender.com"
+                   value="https://chronomedical-webhook.onrender.com">
+            <button type="button" onclick="testConnectivity()">🔍 Tester la Connectivité</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>1. Test de Connectivité <span id="connectivity-status" class="status-badge status-pending">En attente</span></h3>
+            <p>Vérifiez que votre serveur webhook répond :</p>
+            <button type="button" onclick="testConnectivity()">🌐 Test /api/test</button>
+            <button type="button" onclick="testOrdersEndpoint()">📦 Test /api/orders</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Test d'une Commande Simulée <span id="order-status" class="status-badge status-pending">En attente</span></h3>
+            <p>Envoyez une commande de test au webhook :</p>
+            <button type="button" onclick="testOrder()">📦 Envoyer Commande Test</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. Simuler un Message Bot <span id="bot-status" class="status-badge status-pending">En attente</span></h3>
+            <p>Testez la réponse du webhook à un numéro de commande :</p>
+            <input type="text" id="orderRef" placeholder="CM-TEST-123" value="">
+            <button type="button" onclick="testBot()">🤖 Simuler Message Bot</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Test Bot Telegram Réel</h3>
+            <p>Testez directement avec le vrai bot :</p>
+            <button type="button" onclick="openBot()">🔗 Ouvrir @ChronoShopBot</button>
+            <button type="button" onclick="checkWebhookConfig()">⚙️ Vérifier Config Webhook</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let WEBHOOK_URL = '';
+        
+        function getWebhookUrl() {
+            const input = document.getElementById('webhookUrl');
+            WEBHOOK_URL = input.value.trim();
+            if (!WEBHOOK_URL) {
+                showResult('error', '❌ Veuillez entrer une URL de webhook valide');
+                return false;
+            }
+            if (!WEBHOOK_URL.startsWith('http')) {
+                WEBHOOK_URL = 'https://' + WEBHOOK_URL;
+                input.value = WEBHOOK_URL;
+            }
+            return true;
+        }
+        
+        function showResult(type, message) {
+            const result = document.getElementById('result');
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+        }
+        
+        function updateStatus(statusId, status) {
+            const element = document.getElementById(statusId);
+            element.className = `status-badge status-${status}`;
+            element.textContent = status === 'ok' ? 'OK' : status === 'error' ? 'Erreur' : 'En attente';
+        }
+        
+        async function testConnectivity() {
+            if (!getWebhookUrl()) return;
+            
+            showResult('warning', 'Test de connectivité en cours...');
+            updateStatus('connectivity-status', 'pending');
+            
+            try {
+                const response = await fetch(`${WEBHOOK_URL}/api/test`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', `✅ Serveur webhook accessible !
+                    
+URL: ${WEBHOOK_URL}
+Statut: ${response.status}
+Réponse: ${JSON.stringify(data, null, 2)}`);
+                    updateStatus('connectivity-status', 'ok');
+                } else {
+                    showResult('error', `❌ Erreur HTTP ${response.status}: ${JSON.stringify(data)}`);
+                    updateStatus('connectivity-status', 'error');
+                }
+            } catch (error) {
+                showResult('error', `❌ Erreur de connexion: ${error.message}
+                
+Vérifiez que l'URL est correcte et que le serveur est déployé.`);
+                updateStatus('connectivity-status', 'error');
+            }
+        }
+        
+        async function testOrdersEndpoint() {
+            if (!getWebhookUrl()) return;
+            
+            showResult('warning', 'Test de l\'endpoint orders...');
+            
+            try {
+                const response = await fetch(`${WEBHOOK_URL}/api/orders`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', `✅ Endpoint orders fonctionnel !
+                    
+${JSON.stringify(data, null, 2)}`);
+                } else {
+                    showResult('error', `❌ Erreur endpoint orders: ${JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                showResult('error', `❌ Erreur endpoint orders: ${error.message}`);
+            }
+        }
+        
+        async function testOrder() {
+            if (!getWebhookUrl()) return;
+            
+            const orderRef = 'CM-TEST-' + Date.now();
+            document.getElementById('orderRef').value = orderRef;
+            
+            showResult('warning', 'Envoi de la commande test...');
+            updateStatus('order-status', 'pending');
+            
+            const testOrderData = {
+                orderRef: orderRef,
+                items: [
+                    { name: 'Aspirine', quantity: 2, price: 5.99 },
+                    { name: 'Paracétamol', quantity: 1, price: 3.99 }
+                ],
+                total: 15.97,
+                telegram: '@testuser',
+                phone: '+33123456789',
+                email: 'test@example.com',
+                deliveryType: 'home',
+                address: '123 Rue de Test, 75001 Paris'
+            };
+            
+            try {
+                const response = await fetch(`${WEBHOOK_URL}/api/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testOrderData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult('success', `✅ Commande envoyée avec succès !
+                    
+Référence: ${orderRef}
+Réponse: ${JSON.stringify(data, null, 2)}
+
+🎯 Étape suivante: Testez avec le bot en envoyant: ${orderRef}`);
+                    updateStatus('order-status', 'ok');
+                } else {
+                    showResult('error', `❌ Erreur lors de l'envoi: ${JSON.stringify(data, null, 2)}`);
+                    updateStatus('order-status', 'error');
+                }
+            } catch (error) {
+                showResult('error', `❌ Erreur de connexion: ${error.message}`);
+                updateStatus('order-status', 'error');
+            }
+        }
+        
+        async function testBot() {
+            if (!getWebhookUrl()) return;
+            
+            const orderRef = document.getElementById('orderRef').value.trim();
+            
+            if (!orderRef) {
+                showResult('error', '❌ Veuillez entrer un numéro de commande');
+                return;
+            }
+            
+            showResult('warning', 'Simulation du message bot...');
+            updateStatus('bot-status', 'pending');
+            
+            const testMessage = {
+                message: {
+                    chat: { id: 123456789 },
+                    from: { username: 'testuser' },
+                    text: orderRef
+                }
+            };
+            
+            try {
+                const response = await fetch(`${WEBHOOK_URL}/api/webhook`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testMessage)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('success', `✅ Message envoyé au webhook !
+                    
+Référence testée: ${orderRef}
+Statut: ${response.status}
+Réponse: ${JSON.stringify(data, null, 2)}
+
+ℹ️ Vérifiez les logs de votre serveur pour voir si la réponse Telegram a été envoyée.`);
+                    updateStatus('bot-status', 'ok');
+                } else {
+                    showResult('error', `❌ Erreur webhook: ${response.status}`);
+                    updateStatus('bot-status', 'error');
+                }
+            } catch (error) {
+                showResult('error', `❌ Erreur de connexion: ${error.message}`);
+                updateStatus('bot-status', 'error');
+            }
+        }
+        
+        function openBot() {
+            window.open('https://t.me/ChronoShopBot', '_blank');
+        }
+        
+        async function checkWebhookConfig() {
+            showResult('warning', 'Vérification de la configuration webhook Telegram...');
+            
+            try {
+                const response = await fetch('https://api.telegram.org/bot7576637364:AAHc904cJr58hHy3neSLimEMLGHtBxQ9JpA/getWebhookInfo');
+                const data = await response.json();
+                
+                if (data.ok) {
+                    const info = data.result;
+                    showResult('success', `✅ Configuration webhook Telegram:
+                    
+URL configurée: ${info.url || 'Aucune'}
+Certificat: ${info.has_custom_certificate ? 'Oui' : 'Non'}
+Erreurs en attente: ${info.pending_update_count || 0}
+Dernière erreur: ${info.last_error_message || 'Aucune'}
+Dernière erreur le: ${info.last_error_date ? new Date(info.last_error_date * 1000).toLocaleString() : 'Jamais'}
+Tentatives max: ${info.max_connections || 'N/A'}
+
+${info.url ? '🎯 Le webhook est configuré !' : '⚠️ Aucun webhook configuré'}`);
+                } else {
+                    showResult('error', `❌ Erreur API Telegram: ${data.description}`);
+                }
+            } catch (error) {
+                showResult('error', `❌ Erreur vérification webhook: ${error.message}`);
+            }
+        }
+        
+        // Test automatique au chargement
+        window.addEventListener('load', () => {
+            const urlInput = document.getElementById('webhookUrl');
+            if (urlInput.value) {
+                setTimeout(testConnectivity, 1000);
+            }
+        });
+    </script>
+</body>
+</html> 

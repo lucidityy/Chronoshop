@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Webhook ChronoMedical</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Webhook ChronoMedical</h1>
+        
+        <h2>1. Tester une Commande Simulée</h2>
+        <p>Cliquez pour envoyer une commande de test au webhook :</p>
+                <button type="button" onclick="testOrder()">📦 Envoyer Commande Test</button>
+        <h2>2. Simuler un Message Bot</h2>
+        <p>Entrez un numéro de commande pour simuler un message du bot :</p>
+        <input type="text" id="orderRef" placeholder="CM-ABC123-XYZ" value="CM-TEST-123">
+        <button type="button" onclick="testBot()">🤖 Simuler Message Bot</button>
+
+        <h2>3. Tester Bot Telegram</h2>
+        <p>Testez directement avec le bot :</p>
+        <button type="button" onclick="openBot()">🔗 Ouvrir @ChronoShopBot</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const WEBHOOK_URL = 'https://y-jzf97r9q3-1gotscarzs-projects.vercel.app';
+        
+        async function testOrder() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Envoi de la commande test...';
+            
+            const testOrderData = {
+                orderRef: 'CM-TEST-' + Date.now(),
+                items: [
+                    { name: 'Aspirine', quantity: 2, price: 5.99 },
+                    { name: 'Paracétamol', quantity: 1, price: 3.99 }
+                ],
+                total: 15.97,
+                telegram: '@testuser',
+                phone: '+33123456789',
+                email: 'test@example.com',
+                deliveryType: 'home',
+                address: '123 Rue de Test, 75001 Paris'
+            };
+            
+            try {
+                const response = await fetch(WEBHOOK_URL + '/api/orders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testOrderData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.innerHTML = `✅ Commande envoyée avec succès !
+                    
+Référence: ${testOrderData.orderRef}
+Réponse: ${JSON.stringify(data, null, 2)}
+
+Maintenant, testez avec le bot en envoyant: ${testOrderData.orderRef}`;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `❌ Erreur lors de l'envoi:
+                    
+${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `❌ Erreur de connexion:
+                
+${error.message}`;
+            }
+        }
+        
+        async function testBot() {
+            const orderRef = document.getElementById('orderRef').value;
+            const result = document.getElementById('result');
+            
+            if (!orderRef) {
+                result.className = 'result error';
+                result.innerHTML = '❌ Veuillez entrer un numéro de commande';
+                return;
+            }
+            
+            result.innerHTML = 'Simulation du message bot...';
+            
+            const testMessage = {
+                message: {
+                    chat: { id: 123456789 },
+                    from: { username: 'testuser' },
+                    text: orderRef
+                }
+            };
+            
+            try {
+                const response = await fetch(WEBHOOK_URL + '/api/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testMessage)
+                });
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.innerHTML = `✅ Message envoyé au webhook !
+                    
+Référence testée: ${orderRef}
+Statut: ${response.status}
+
+Vérifiez les logs du webhook pour voir la réponse.`;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `❌ Erreur: ${response.status}`;
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = `❌ Erreur de connexion:
+                
+${error.message}`;
+            }
+        }
+        
+        function openBot() {
+            window.open('https://t.me/ChronoShopBot', '_blank');
+        }
+    </script>
+</body>
+</html> 
